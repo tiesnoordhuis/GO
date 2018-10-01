@@ -2,15 +2,19 @@ package main
 
 import (
 	"fmt"
-)
+	//"bufio"
+	"image/color"
+	//"os"
 
-type Square struct {
-	taken bool
-	color string
-	player string
-  X int
-  Y int
-}
+		"github.com/oakmound/oak"
+	  "github.com/oakmound/oak/entities"
+		"github.com/oakmound/oak/render"
+		"github.com/oakmound/oak/scene"
+		"github.com/oakmound/oak/dlog"
+		"github.com/oakmound/oak/key"
+		"github.com/oakmound/oak/event"
+		"github.com/oakmound/oak/physics"
+)
 
 type Player struct {
 	name string
@@ -19,58 +23,121 @@ type Player struct {
 	losses int
 }
 
-type Board struct {
-  squares [10][10]Square
-}
-
 type Game struct {
   turn int
   player1 Player
   player2 Player
-  boards []Board
+  stukken_white Stukken
+	stukken_black Stukken
   finished bool
   winner Player
 }
 
+type Stuk struct {
+	X, Y int
+
+	color string
+	owner Player
+}
+
+type Stukken struct {
+	stukken []Stuk
+}
+
 func main() {
-  var player_1 Player = Player{name: "ties"}
-  var player_2 Player = Player{name: "name2"}
-	new_game := play_game(player_1, player_2)
-  fmt.Println(new_game)
-  display_board(new_game.boards[0])
+	oak.SetupConfig.Screen.Width = 800
+  oak.SetupConfig.Screen.Height = 800
+		oak.Add("dammen", func(string, interface{}) {
+			fmt.Print("name: ")
+		  var player_1 Player = Player{name: "ties"}
+		  var player_2 Player = Player{name: "name2"}
+			var new_game Game = play_game(player_1, player_2)
+			for i := 0; i < 5; i++ {
+				for j := 0; j < 4; j++ {
+					new_white_stuk := Stuk{((i * 2) + (j % 2)), j, "white", new_game.player1}
+					new_game.stukken_white.stukken = append(new_game.stukken_white.stukken, new_white_stuk)
+
+					new_black_stuk := Stuk{((i * 2) + (1 - (j % 2))), 10 - j, "black", new_game.player2}
+					new_game.stukken_black.stukken = append(new_game.stukken_black.stukken, new_black_stuk)
+				}
+			}
+		  fmt.Println(new_game)
+			board_img, err := render.LoadSprite("", "board.png")
+			dlog.ErrorCheck(err)
+			render.Draw(board_img)
+		  display_stukken(new_game.stukken_white, "white")
+			display_stukken(new_game.stukken_black, "black")
+
+			selector_white := entities.NewMoving(100, 100, 40, 40,
+					render.NewColorBox(10, 10, color.RGBA{255, 255, 255, 100}),
+					nil, 0, 0)
+			selector_white.Speed = physics.NewVector(5, 5)
+
+			render.Draw(selector_white.R)
+
+			selector_white.Bind(func(id int, _ interface{}) int {
+            selector_white := event.GetEntity(id).(*entities.Moving)
+            selector_white.Delta.Zero()
+            if oak.IsDown(key.W) {
+                selector_white.Delta.ShiftY(-selector_white.Speed.Y())
+            }
+            if oak.IsDown(key.A) {
+                selector_white.Delta.ShiftX(-selector_white.Speed.X())
+            }
+            if oak.IsDown(key.S) {
+                selector_white.Delta.ShiftY(selector_white.Speed.Y())
+            }
+            if oak.IsDown(key.D) {
+                selector_white.Delta.ShiftX(selector_white.Speed.X())
+            }
+            selector_white.ShiftPos(selector_white.Delta.X(), selector_white.Delta.Y())
+						fmt.Println(selector_white)
+						if checkCollision(selector_white.Solid.Doodad.P, new_game.stukken_white.stukken) {
+							SetRenderable(render.NewColorBox(10, 10, color.RGBA{100, 100, 100, 100}))
+						} else {
+							SetRenderable(render.NewColorBox(10, 10, color.RGBA{255, 255, 255, 100}))
+						}
+
+            return 0
+        }, event.Enter)
+
+		}, func() bool {
+
+				return true
+		}, func() (string, *scene.Result) {
+				return "dammen", nil
+		})
+		oak.Init("dammen")
 }
 
 func play_game(player_1 Player, player_2 Player) Game {
-  var new_game Game = Game{turn: 0, player1: player_1, player2: player_2, finished: false}
-  new_game.boards = make([]Board, 1)
-  var new_board Board = build_empty_board()
-  new_game.boards[0] = new_board
+	stukken_white := Stukken{}
+	stukken_black := Stukken{}
+  var new_game Game = Game{turn: 0, player1: player_1, player2: player_2, finished: false, stukken_white: stukken_white, stukken_black: stukken_black}
   return new_game
 }
 
-func build_empty_board() Board {
-  var new_board Board
-  for index_row := range new_board.squares {
-    for index_colum := range new_board.squares[index_row] {
-			if ((index_row + index_colum) % 2) == 0 {
-        new_board.squares[index_row][index_colum] = Square{taken: false, color: "black", X: index_colum, Y: index_row}
-      } else {
-        new_board.squares[index_row][index_colum] = Square{taken: false, color: "white", X: index_colum, Y: index_row}
-      }
+func display_stukken(stukken Stukken, stuk_color string) {
+	height := float64(oak.SetupConfig.Screen.Height)
+	if stuk_color == "black" {
+		for index, value := range stukken.stukken {
+			stuk1 := entities.NewMoving(207 + (float64(value.X) * 40), -73 + ((float64(value.Y) * 40)), 40, 40,
+					render.NewColorBox(24, 24, color.RGBA{255, 255, 0, 255}),
+					nil, 0, 0)
+			fmt.Println(index)
+			render.Draw(stuk1.R)
+		}
+	} else if stuk_color == "white" {
+		for index, value := range stukken.stukken {
+			stuk1 := entities.NewMoving(207 + (float64(value.X) * 40), -233 + (height - (float64(value.Y) * 40)), 40, 40,
+					render.NewColorBox(24, 24, color.RGBA{0, 255, 0, 255}),
+					nil, 0, 0)
+			fmt.Println(index)
+			render.Draw(stuk1.R)
 		}
 	}
-  return new_board
 }
 
-func display_board(board Board) {
-  for index_row := range board.squares {
-    for index_colum := range board.squares[index_row] {
-			if board.squares[index_row][index_colum].color == "black" {
-        fmt.Printf("#")
-      } else {
-        fmt.Printf("O")
-      }
-		}
-    fmt.Printf("\n")
-	}
+func checkCollision(selector_point Point, check_stukken []Stuk) bool {
+
 }
