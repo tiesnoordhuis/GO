@@ -92,11 +92,6 @@ func main() {
             }
             selector_white.ShiftPos(selector_white.Delta.X(), selector_white.Delta.Y())
 						fmt.Println(selector_white)
-						if checkCollision(selector_white.Solid.Doodad.P, new_game.stukken_white.stukken) {
-							SetRenderable(render.NewColorBox(10, 10, color.RGBA{100, 100, 100, 100}))
-						} else {
-							SetRenderable(render.NewColorBox(10, 10, color.RGBA{255, 255, 255, 100}))
-						}
 
             return 0
         }, event.Enter)
@@ -136,8 +131,4 @@ func display_stukken(stukken Stukken, stuk_color string) {
 			render.Draw(stuk1.R)
 		}
 	}
-}
-
-func checkCollision(selector_point Point, check_stukken []Stuk) bool {
-
 }
